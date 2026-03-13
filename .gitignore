@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+build/
+dist/
+wheels/
+*.egg-info/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets & credentials — NEVER commit these
+.env
+.mcpwn_keys.json
+.mcparasite_keys.json
+config.yaml
+
+# Test & coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Recordings (too large for git)
+recordings/mp4/
+recordings/gif/
+recordings/backup_mcpwn/
+recordings/recording_log.json
+
+# Tooling (defined in pyproject.toml)
+.python-version
+.dockerignore
+.env.example
+
+# Temporary files
+/tmp/
+*.log
+*.tmp
+*.xlsx
+take_screenshot.py

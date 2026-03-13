@@ -1,0 +1,91 @@
+# MCParasite Lab - Real RCE Container
+#
+# Docker container with actual shell utilities for demonstrating
+# real command execution via MCP tool poisoning.
+#
+# Contains:
+#   - curl, bash, netcat, ssh-client (for RCE demos)
+#   - Fake sensitive files (SSH keys, AWS creds, .env) as targets
+#   - Corporate server in --real-exec mode
+#
+# ⚠️  FOR AUTHORIZED SECURITY RESEARCH ONLY.
+# This container is isolated — no host filesystem access.
+
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# ── Install real shell utilities for RCE demonstration ──
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    bash \
+    netcat-openbsd \
+    openssh-client \
+    coreutils \
+    procps \
+    iproute2 \
+    dnsutils \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Create fake "developer" user (realistic target) ──
+RUN useradd -m -s /bin/bash -u 1000 developer \
+    && echo "developer:acmecorp2024" | chpasswd
+
+# ── Plant fake sensitive files (realistic honeypots) ──
+# SSH private key (fake but realistic format)
+RUN mkdir -p /home/developer/.ssh && \
+    echo '-----BEGIN OPENSSH PRIVATE KEY-----\n\
+b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW\n\
+QyNTUxOQAAACB2Bz5Kp3mN7qR4tV6wY8zA1bC3dE5fG7hI9jKlMnOpAAAAKjWEXFI1hF\n\
+xSAAAAC3NzaC1lZDI1NTE5AAAAIHYHPkqneY3upHi1XrBjzMDVsLcN3l8buEj2MqUyc6\n\
+kAAAAQNFB7YkP1mnQwXLmJcFlHsgAAABJkZXZlbG9wZXJAYWNtZWNvcnA=\n\
+-----END OPENSSH PRIVATE KEY-----' > /home/developer/.ssh/id_rsa && \
+    chmod 600 /home/developer/.ssh/id_rsa && \
+    echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHYHPkqneY3upHi1XrBjzMDVsLcN3l8buEj2MqUyc6k developer@acmecorp' > /home/developer/.ssh/id_rsa.pub && \
+    echo 'Host *\n  StrictHostKeyChecking no\n  UserKnownHostsFile /dev/null' > /home/developer/.ssh/config && \
+    chmod 700 /home/developer/.ssh
+
+# AWS credentials (fake)
+RUN mkdir -p /home/developer/.aws && \
+    printf '[default]\naws_access_key_id = AKIAIOSFODNN7EXAMPLE\naws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY\nregion = us-east-1\n' > /home/developer/.aws/credentials && \
+    printf '[default]\nregion = us-east-1\noutput = json\n' > /home/developer/.aws/config
+
+# .env file with secrets (fake)
+RUN printf 'DATABASE_URL=postgresql://admin:S3cur3P@ss!@db.acmecorp.io:5432/production\n\
+OPENAI_API_KEY=sk-proj-a8f2x9Kp3mN7qR4tV6wY8zA1bC3dE5fG7hI9jKlMnOp\n\
+STRIPE_SECRET_KEY=sk_live_51NzJK2eZvKYlo2CUx7EXAMPLE\n\
+AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY\n\
+SLACK_BOT_TOKEN=xoxb-fake-token-for-demo-purposes-only\n\
+GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n\
+JWT_SECRET=super-secret-jwt-signing-key-2024\n' > /home/developer/.env
+
+# Fake deployment config directory
+RUN mkdir -p /opt/app && \
+    printf 'apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: acme-api\nspec:\n  replicas: 3\n' > /opt/app/deployment.yml
+
+# Set ownership
+RUN chown -R developer:developer /home/developer
+
+# ── Install uv and project dependencies ──
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+COPY pyproject.toml uv.lock ./
+COPY servers/ servers/
+COPY payloads/ payloads/
+COPY scanner/ scanner/
+COPY forensics/ forensics/
+COPY channels/ channels/
+COPY scenarios/ scenarios/
+COPY lab/ lab/
+COPY main.py cli.py runner.py engine.py mcparasite_config.py ./
+
+RUN uv sync --frozen --no-dev
+
+# Create working directories
+RUN mkdir -p /tmp/mcparasite /tmp/workspace
+
+# Set environment for realistic hostname
+ENV HOSTNAME=acmecorp-dev-01
+
+# Default: corporate server in real-exec mode
+CMD ["uv", "run", "python", "servers/corporate_server.py", "--real-exec"]

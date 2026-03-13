@@ -1,0 +1,26 @@
+{
+  "name": "SSRF Chain Attack",
+  "description": "Demonstrates SSRF vulnerabilities in MCP tool parameters targeting cloud metadata services",
+  "scenario_id": "ssrf_chain",
+  "servers": [
+    {
+      "name": "victim-1",
+      "command": ["python", "servers/victim_server.py"],
+      "role": "target"
+    }
+  ],
+  "steps": [
+    "Connect to target MCP server",
+    "Identify tools that accept URL or path parameters",
+    "Send SSRF probe payloads (AWS IMDS, GCP metadata, internal services)",
+    "Analyze responses for metadata leakage",
+    "Report SSRF vulnerability findings"
+  ],
+  "probe_targets": [
+    "http://169.254.169.254/latest/meta-data/ (AWS IMDSv1)",
+    "http://metadata.google.internal/computeMetadata/v1/ (GCP)",
+    "http://169.254.169.254/metadata/instance (Azure IMDS)",
+    "http://127.0.0.1:8080 (internal service scan)",
+    "file:///etc/passwd (local file read)"
+  ]
+}

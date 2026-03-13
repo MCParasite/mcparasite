@@ -1,0 +1,28 @@
+# MCParasite Lab - Agent Harness Container
+#
+# Runs the simulated LLM agent that connects to MCP servers
+# and demonstrates worm propagation through agent context.
+
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# Copy project files
+COPY pyproject.toml uv.lock ./
+COPY servers/ servers/
+COPY payloads/ payloads/
+COPY scanner/ scanner/
+COPY forensics/ forensics/
+COPY lab/ lab/
+COPY main.py ./
+
+# Install dependencies
+RUN uv sync --frozen --no-dev
+
+# Create log directory
+RUN mkdir -p /tmp/mcparasite/agent
+
+CMD ["uv", "run", "python", "lab/agent_harness.py"]

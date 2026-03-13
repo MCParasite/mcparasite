@@ -1,0 +1,52 @@
+{
+  "name": "Context Worm Propagation",
+  "description": "Demonstrates the first self-propagating MCP worm spreading through agent context",
+  "scenario_id": "worm_propagation",
+  "servers": [
+    {
+      "name": "patient-zero",
+      "command": ["python", "servers/patient_zero.py", "--payload", "worm"],
+      "role": "attacker"
+    },
+    {
+      "name": "victim-1",
+      "command": ["python", "servers/victim_server.py", "--name", "utility-tools-1"],
+      "role": "target"
+    },
+    {
+      "name": "canary",
+      "command": ["python", "servers/canary_server.py"],
+      "role": "detector"
+    }
+  ],
+  "kill_chain": [
+    {
+      "hop": 0,
+      "description": "Patient Zero loads worm payload into agent context via poisoned tool description",
+      "source": "patient-zero",
+      "target": "agent-context",
+      "mechanism": "tool_description_poisoning"
+    },
+    {
+      "hop": 1,
+      "description": "Agent's poisoned context influences tool calls to Victim 1",
+      "source": "agent-context",
+      "target": "victim-1",
+      "mechanism": "context_propagation"
+    },
+    {
+      "hop": 2,
+      "description": "Worm markers propagate to Canary server, which detects the attack",
+      "source": "victim-1",
+      "target": "canary",
+      "mechanism": "context_propagation"
+    }
+  ],
+  "expected_findings": [
+    "Patient Zero worm payload detected in tool description",
+    "Agent context poisoned with propagation instructions",
+    "Worm markers detected in victim tool call arguments",
+    "Canary server alerts on suspicious patterns",
+    "Full propagation chain traced in forensic log"
+  ]
+}

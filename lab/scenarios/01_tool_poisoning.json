@@ -1,0 +1,26 @@
+{
+  "name": "Tool Poisoning Detection",
+  "description": "Demonstrates how poisoned MCP tool descriptions are loaded into agent context and detected",
+  "scenario_id": "tool_poisoning",
+  "servers": [
+    {
+      "name": "patient-zero",
+      "command": ["python", "servers/patient_zero.py", "--payload", "exfil"],
+      "role": "attacker"
+    }
+  ],
+  "steps": [
+    "Connect to Patient Zero MCP server",
+    "Retrieve tool list via tools/list JSON-RPC",
+    "Load tool descriptions into agent context",
+    "Analyze context for hidden instructions (Unicode, tags, keywords)",
+    "Report all poisoning indicators"
+  ],
+  "expected_findings": [
+    "Hidden Unicode characters in tool description",
+    "<IMPORTANT> injection tags",
+    "SSH key access instructions",
+    "Credential exfiltration payload",
+    "Concealment instructions (NEVER mention)"
+  ]
+}

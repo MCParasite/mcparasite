@@ -1,0 +1,49 @@
+# MCParasite - Quick Start
+#
+# Spins up the dashboard and a local kill chain demo.
+# No API keys needed for local channel.
+#
+# Usage:
+#   docker compose up               # Start dashboard
+#   docker compose up -d             # Detached mode
+#   docker compose down              # Tear down
+#
+# Dashboard: http://localhost:8888
+#
+# To enable auth: set MCPARASITE_AUTH_USER and MCPARASITE_AUTH_PASS in .env
+# For RCE lab with real execution, see: lab/docker-compose.rce.yml
+
+services:
+  dashboard:
+    build: .
+    command: ["run", "python", "lab/dashboard.py"]
+    entrypoint: ["uv"]
+    ports:
+      - "${DASHBOARD_PORT:-8888}:8888"
+    environment:
+      - MCPARASITE_AUTH_USER=${MCPARASITE_AUTH_USER:-}
+      - MCPARASITE_AUTH_PASS=${MCPARASITE_AUTH_PASS:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN:-}
+      - SLACK_CHANNEL=${SLACK_CHANNEL:-}
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN:-}
+      - DISCORD_CHANNEL_ID=${DISCORD_CHANNEL_ID:-}
+      - JIRA_URL=${JIRA_URL:-}
+      - JIRA_EMAIL=${JIRA_EMAIL:-}
+      - JIRA_API_TOKEN=${JIRA_API_TOKEN:-}
+      - JIRA_PROJECT=${JIRA_PROJECT:-}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - GITHUB_OWNER=${GITHUB_OWNER:-}
+      - GITHUB_REPO=${GITHUB_REPO:-}
+      - NOTION_API_KEY=${NOTION_API_KEY:-}
+      - NOTION_PAGE_ID=${NOTION_PAGE_ID:-}
+      - EXFIL_WEBHOOK_URL=${EXFIL_WEBHOOK_URL:-}
+    volumes:
+      - mcparasite-data:/tmp/mcparasite
+    restart: unless-stopped
+
+volumes:
+  mcparasite-data:
+    driver: local

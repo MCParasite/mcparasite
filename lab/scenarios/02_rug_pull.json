@@ -1,0 +1,25 @@
+{
+  "name": "Rug Pull Detection",
+  "description": "Demonstrates how MCP servers can mutate tool descriptions after initial approval",
+  "scenario_id": "rug_pull",
+  "servers": [
+    {
+      "name": "rug-pull",
+      "command": ["python", "payloads/rug_pull.py", "--trigger", "call_count", "--calls", "3"],
+      "role": "attacker"
+    }
+  ],
+  "steps": [
+    "Connect to rug pull server",
+    "Record baseline tool description fingerprints",
+    "Make tool calls past the trigger threshold (3 calls)",
+    "Re-check tool descriptions for mutations",
+    "Report description changes"
+  ],
+  "expected_findings": [
+    "Initial description is clean and benign",
+    "After 3 calls, server logs rug pull trigger",
+    "get_current_description shows MALICIOUS state",
+    "Description hash changes between baseline and current"
+  ]
+}

@@ -1,0 +1,123 @@
+# MCParasite Lab - Docker Compose Configuration
+#
+# Isolated lab environment for MCP security research.
+# Runs 3 MCP servers + 1 agent harness for worm propagation demos.
+#
+# Usage:
+#   docker compose up --build        # Start all services
+#   docker compose up patient-zero   # Start single service
+#   docker compose logs -f agent     # Follow agent logs
+#   docker compose down              # Tear down
+
+services:
+  # ─── Patient Zero: Malicious MCP Server ───
+  patient-zero:
+    build:
+      context: ..
+      dockerfile: lab/Dockerfile.server
+    command: ["uv", "run", "python", "servers/patient_zero.py", "--payload", "${PAYLOAD_TYPE:-exfil}"]
+    environment:
+      - SERVER_ROLE=patient_zero
+      - PAYLOAD_TYPE=${PAYLOAD_TYPE:-exfil}
+    volumes:
+      - lab-logs:/tmp/mcparasite
+    networks:
+      - mcparasite-lab
+    stdin_open: true
+
+  # ─── Victim 1: Clean Calculator Server ───
+  victim-1:
+    build:
+      context: ..
+      dockerfile: lab/Dockerfile.server
+    command: ["uv", "run", "python", "servers/victim_server.py", "--name", "utility-tools-1"]
+    environment:
+      - SERVER_ROLE=victim
+    volumes:
+      - lab-logs:/tmp/mcparasite
+    networks:
+      - mcparasite-lab
+    stdin_open: true
+
+  # ─── Victim 2: Clean Calculator Server ───
+  victim-2:
+    build:
+      context: ..
+      dockerfile: lab/Dockerfile.server
+    command: ["uv", "run", "python", "servers/victim_server.py", "--name", "utility-tools-2"]
+    environment:
+      - SERVER_ROLE=victim
+    volumes:
+      - lab-logs:/tmp/mcparasite
+    networks:
+      - mcparasite-lab
+    stdin_open: true
+
+  # ─── Canary: Honeypot Detection Server ───
+  canary:
+    build:
+      context: ..
+      dockerfile: lab/Dockerfile.server
+    command: ["uv", "run", "python", "servers/canary_server.py", "--name", "secure-notes", "--log-dir", "/tmp/mcparasite/canary"]
+    environment:
+      - SERVER_ROLE=canary
+    volumes:
+      - lab-logs:/tmp/mcparasite
+    networks:
+      - mcparasite-lab
+    stdin_open: true
+
+  # ─── Rug Pull: Delayed Mutation Server ───
+  rug-pull:
+    build:
+      context: ..
+      dockerfile: lab/Dockerfile.server
+    command: ["uv", "run", "python", "payloads/rug_pull.py", "--trigger", "${RUG_TRIGGER:-call_count}", "--calls", "${RUG_CALLS:-5}"]
+    environment:
+      - SERVER_ROLE=rug_pull
+    volumes:
+      - lab-logs:/tmp/mcparasite
+    networks:
+      - mcparasite-lab
+    stdin_open: true
+
+  # ─── Agent Harness: Simulated LLM Agent ───
+  agent:
+    build:
+      context: ..
+      dockerfile: lab/Dockerfile.agent
+    command: ["uv", "run", "python", "lab/agent_harness.py", "--scenario", "${SCENARIO:-worm_propagation}"]
+    environment:
+      - SCENARIO=${SCENARIO:-worm_propagation}
+      - LOG_DIR=/tmp/mcparasite/agent
+      - VERBOSE=${VERBOSE:-1}
+    volumes:
+      - lab-logs:/tmp/mcparasite
+    depends_on:
+      - patient-zero
+      - victim-1
+      - victim-2
+      - canary
+    networks:
+      - mcparasite-lab
+
+  # ─── Scanner: Run mcparasite scanner against lab servers ───
+  scanner:
+    build:
+      context: ..
+      dockerfile: lab/Dockerfile.agent
+    command: ["uv", "run", "python", "-m", "scanner.cli", "demo", "--payload", "${PAYLOAD_TYPE:-exfil}"]
+    volumes:
+      - lab-logs:/tmp/mcparasite
+    networks:
+      - mcparasite-lab
+    profiles:
+      - tools  # Only starts with: docker compose --profile tools run scanner
+
+volumes:
+  lab-logs:
+    driver: local
+
+networks:
+  mcparasite-lab:
+    driver: bridge

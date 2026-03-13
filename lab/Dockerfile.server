@@ -1,0 +1,27 @@
+# MCParasite Lab - MCP Server Container
+#
+# Runs any of the MCParasite MCP servers (patient_zero, victim, canary, rug_pull).
+# Uses uv for fast, reproducible Python package management.
+
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# Copy project files
+COPY pyproject.toml uv.lock ./
+COPY servers/ servers/
+COPY payloads/ payloads/
+COPY scanner/ scanner/
+COPY forensics/ forensics/
+
+# Install dependencies
+RUN uv sync --frozen --no-dev
+
+# Create log directory
+RUN mkdir -p /tmp/mcparasite
+
+# Default: run patient zero (overridden by docker-compose)
+CMD ["uv", "run", "python", "servers/patient_zero.py"]

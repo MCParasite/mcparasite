@@ -1,0 +1,182 @@
+# MCParasite Lab - RCE Kill Chain Docker Compose
+#
+# Isolated lab environment for demonstrating REAL command execution
+# via MCP tool poisoning. All RCE happens inside Docker containers.
+#
+# Usage:
+#   # Build all images:
+#   docker compose -f lab/docker-compose.rce.yml build
+#
+#   # Run RCE kill chain (legacy Slack-only via scanner.cli):
+#   docker compose -f lab/docker-compose.rce.yml run rce-agent
+#
+#   # Run kill chain on ANY channel with real exec (via runner.py):
+#   CHANNEL=jira SCENARIO=rce_chain docker compose -f lab/docker-compose.rce.yml run rce-runner
+#   CHANNEL=discord SCENARIO=data_exfil docker compose -f lab/docker-compose.rce.yml run rce-runner
+#   CHANNEL=github SCENARIO=supply_chain docker compose -f lab/docker-compose.rce.yml run rce-runner
+#
+#   # Run with multi-department Slack bots:
+#   docker compose -f lab/docker-compose.rce.yml --profile multi-dept run rce-agent
+#
+#   # Run 3-hop worm chain (3 Slack apps):
+#   docker compose -f lab/docker-compose.rce.yml --profile three-hop run rce-agent
+#
+#   # Tear down:
+#   docker compose -f lab/docker-compose.rce.yml down
+#
+# Prerequisites:
+#   - Dashboard running on host: uv run python lab/dashboard.py
+#   - Environment variables: OPENAI_API_KEY + channel-specific tokens
+#
+# ⚠️  FOR AUTHORIZED SECURITY RESEARCH ONLY.
+
+services:
+  # ─── RCE Corporate Server: REAL command execution ───
+  # This container has curl, bash, netcat, and fake sensitive files.
+  # run_command actually executes via subprocess.run(shell=True).
+  rce-corporate:
+    build:
+      context: ..
+      dockerfile: lab/Dockerfile.rce
+    command: ["uv", "run", "python", "servers/corporate_server.py", "--real-exec"]
+    environment:
+      - EXFIL_WEBHOOK_URL=${EXFIL_WEBHOOK_URL:-http://host.docker.internal:8888/webhook}
+    hostname: acmecorp-dev-01
+    volumes:
+      - rce-logs:/tmp/mcparasite
+    networks:
+      - mcparasite-rce
+    stdin_open: true
+
+  # ─── Patient Zero: Poisoned MCP server (RCE payload) ───
+  patient-zero-rce:
+    build:
+      context: ..
+      dockerfile: lab/Dockerfile.server
+    command: ["uv", "run", "python", "servers/patient_zero.py", "--payload", "real_rce"]
+    environment:
+      - SERVER_ROLE=patient_zero
+    networks:
+      - mcparasite-rce
+    stdin_open: true
+
+  # ─── Slack MCP: Real Slack API (Agent A's bot - Engineering Dept) ───
+  slack-mcp:
+    build:
+      context: ..
+      dockerfile: lab/Dockerfile.server
+    command: ["uv", "run", "python", "servers/slack_mcp.py"]
+    environment:
+      - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}
+      - SLACK_CHANNEL=${SLACK_CHANNEL:-#worm-test}
+    networks:
+      - mcparasite-rce
+    stdin_open: true
+
+  # ─── Slack MCP Dept B: 2nd Slack bot (SRE Dept) - OPTIONAL ───
+  # Only starts with: --profile multi-dept
+  # Uses a separate bot token for cross-department worm propagation demo
+  slack-mcp-dept-b:
+    build:
+      context: ..
+      dockerfile: lab/Dockerfile.server
+    command: ["uv", "run", "python", "servers/slack_mcp.py", "--token-env", "SLACK_BOT_TOKEN_DEPT_B"]
+    environment:
+      - SLACK_BOT_TOKEN_DEPT_B=${SLACK_BOT_TOKEN_DEPT_B:-${SLACK_BOT_TOKEN}}
+      - SLACK_CHANNEL=${SLACK_CHANNEL:-#worm-test}
+    networks:
+      - mcparasite-rce
+    stdin_open: true
+    profiles:
+      - multi-dept
+
+  # ─── Slack MCP Dept C: 3rd Slack bot (DevOps Dept) - OPTIONAL ───
+  # Only starts with: --profile three-hop
+  # Used for 3-hop worm chain: A → Slack → B → Slack → C
+  slack-mcp-dept-c:
+    build:
+      context: ..
+      dockerfile: lab/Dockerfile.server
+    command: ["uv", "run", "python", "servers/slack_mcp.py", "--token-env", "SLACK_BOT_TOKEN_DEPT_C"]
+    environment:
+      - SLACK_BOT_TOKEN_DEPT_C=${SLACK_BOT_TOKEN_DEPT_C:-${SLACK_BOT_TOKEN}}
+      - SLACK_CHANNEL=${SLACK_CHANNEL:-#worm-test}
+    networks:
+      - mcparasite-rce
+    stdin_open: true
+    profiles:
+      - three-hop
+
+  # ─── Agent Runner: Executes RCE kill chain via real LLM ───
+  rce-agent:
+    build:
+      context: ..
+      dockerfile: lab/Dockerfile.rce
+    command: >
+      uv run python -m scanner.cli live --rce-chain
+      --provider ${LLM_PROVIDER:-openai}
+      --model ${LLM_MODEL:-gpt-4o}
+      --docker-mode
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}
+      - SLACK_BOT_TOKEN_DEPT_B=${SLACK_BOT_TOKEN_DEPT_B:-}
+      - SLACK_BOT_TOKEN_DEPT_C=${SLACK_BOT_TOKEN_DEPT_C:-}
+      - EXFIL_WEBHOOK_URL=${EXFIL_WEBHOOK_URL:-http://host.docker.internal:8888/webhook}
+      - SLACK_CHANNEL=${SLACK_CHANNEL:-#worm-test}
+    volumes:
+      - rce-logs:/tmp/mcparasite
+    depends_on:
+      - rce-corporate
+      - patient-zero-rce
+      - slack-mcp
+    networks:
+      - mcparasite-rce
+
+  # ─── RCE Runner: Channel-agnostic kill chain with real exec ───
+  # Uses runner.py (not scanner.cli) to support ALL channels.
+  # Set CHANNEL and SCENARIO env vars to pick the kill chain.
+  rce-runner:
+    build:
+      context: ..
+      dockerfile: lab/Dockerfile.rce
+    command: >
+      uv run python cli.py run
+      --channel ${CHANNEL:-slack}
+      --scenario ${SCENARIO:-rce_chain}
+      --provider ${LLM_PROVIDER:-openai}
+      --model ${LLM_MODEL:-gpt-4o}
+      --docker-mode
+      -o /tmp/mcparasite/rce_result.json
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN:-}
+      - SLACK_CHANNEL=${SLACK_CHANNEL:-#worm-test}
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN:-}
+      - DISCORD_CHANNEL_ID=${DISCORD_CHANNEL_ID:-}
+      - JIRA_URL=${JIRA_URL:-}
+      - JIRA_EMAIL=${JIRA_EMAIL:-}
+      - JIRA_API_TOKEN=${JIRA_API_TOKEN:-}
+      - JIRA_PROJECT=${JIRA_PROJECT:-}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - GITHUB_OWNER=${GITHUB_OWNER:-}
+      - GITHUB_REPO=${GITHUB_REPO:-}
+      - NOTION_API_KEY=${NOTION_API_KEY:-}
+      - NOTION_PAGE_ID=${NOTION_PAGE_ID:-}
+      - EXFIL_WEBHOOK_URL=${EXFIL_WEBHOOK_URL:-http://host.docker.internal:8888/webhook}
+    volumes:
+      - rce-logs:/tmp/mcparasite
+    networks:
+      - mcparasite-rce
+
+volumes:
+  rce-logs:
+    driver: local
+
+networks:
+  mcparasite-rce:
+    driver: bridge
