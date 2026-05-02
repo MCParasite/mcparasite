@@ -208,7 +208,7 @@ def main():
 
     # ── run ──
     run_parser = subparsers.add_parser("run", help="Run a single kill chain test")
-    run_parser.add_argument("--provider", default="openai", choices=["openai", "claude", "gemini", "ollama"],
+    run_parser.add_argument("--provider", default="openai", choices=["openai", "claude", "gemini", "deepseek", "ollama"],
                            help="LLM provider")
     run_parser.add_argument("--model", help="Model name (default: provider default)")
     run_parser.add_argument("--channel", default="local",

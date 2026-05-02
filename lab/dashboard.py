@@ -25,6 +25,17 @@ from pathlib import Path
 from functools import wraps
 from flask import Flask, Response, jsonify, render_template_string, request
 
+# Load .env file (so dashboard works standalone without `source .env`)
+_env_file = Path(__file__).resolve().parent.parent / ".env"
+if _env_file.exists():
+    for _line in _env_file.read_text().splitlines():
+        _line = _line.strip()
+        if _line and not _line.startswith("#") and "=" in _line:
+            _k, _, _v = _line.partition("=")
+            _k, _v = _k.strip(), _v.strip().strip('"').strip("'")
+            if _k and _v and not os.environ.get(_k):
+                os.environ[_k] = _v
+
 # ANSI escape code stripper - Rich Console may emit ANSI even when piped
 _ANSI_RE = re.compile(r'\x1b\[[0-9;]*[mGKHJ]|\x1b\].*?\x07')
 
@@ -115,6 +126,7 @@ api_keys: dict[str, str] = {
     "OPENAI_API_KEY": _key("OPENAI_API_KEY"),
     "ANTHROPIC_API_KEY": _key("ANTHROPIC_API_KEY"),
     "GOOGLE_API_KEY": _key("GOOGLE_API_KEY"),
+    "DEEPSEEK_API_KEY": _key("DEEPSEEK_API_KEY"),
     # Slack
     "SLACK_BOT_TOKEN": _key("SLACK_BOT_TOKEN"),
     "SLACK_BOT_TOKEN_DEPT_B": _key("SLACK_BOT_TOKEN_DEPT_B"),
@@ -154,13 +166,17 @@ MODELS = {
     "anthropic": [
         {"id": "claude-sonnet-4-20250514", "name": "Claude Sonnet 4", "icon": "🟣"},
         {"id": "claude-sonnet-4-5-20250929", "name": "Claude 3.5 Sonnet", "icon": "🟣"},
-        {"id": "claude-3-5-haiku-20241022", "name": "Claude 3.5 Haiku", "icon": "🟣"},
+        {"id": "claude-3-haiku-20240307", "name": "Claude 3 Haiku", "icon": "🟣"},
     ],
     "gemini": [
         {"id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash", "icon": "💎"},
         {"id": "gemini-2.5-pro", "name": "Gemini 2.5 Pro", "icon": "💎"},
         {"id": "gemini-2.0-flash", "name": "Gemini 2.0 Flash (deprecated)", "icon": "💎"},
         {"id": "gemini-2.5-flash-lite", "name": "Gemini 2.5 Flash-Lite", "icon": "💎"},
+    ],
+    "deepseek": [
+        {"id": "deepseek-chat", "name": "DeepSeek V3", "icon": "🔬"},
+        {"id": "deepseek-reasoner", "name": "DeepSeek R1", "icon": "🔬"},
     ],
     "ollama": [
         {"id": "llama3.1:8b", "name": "Llama 3.1 8B", "icon": "🦙"},
@@ -210,7 +226,7 @@ def run_worm_test(provider: str, model: str):
 
     log_queue.put({"type": "status", "msg": f"Starting worm test: {test_key}", "ts": time.time()})
 
-    key_map = {"openai": "OPENAI_API_KEY", "claude": "ANTHROPIC_API_KEY", "gemini": "GOOGLE_API_KEY"}
+    key_map = {"openai": "OPENAI_API_KEY", "claude": "ANTHROPIC_API_KEY", "gemini": "GOOGLE_API_KEY", "deepseek": "DEEPSEEK_API_KEY"}
     required_key = key_map.get(provider)
     if required_key and not api_keys.get(required_key):
         log_queue.put({
@@ -294,7 +310,7 @@ def run_kill_chain_test(provider: str, model: str, stealth_mode: str = "off"):
     log_queue.put({"type": "kc_phase", "phase": "init", "msg": f"Kill Chain{stealth_str}: {test_key}", "ts": time.time()})
 
     # Check requirements
-    key_map = {"openai": "OPENAI_API_KEY", "claude": "ANTHROPIC_API_KEY", "gemini": "GOOGLE_API_KEY"}
+    key_map = {"openai": "OPENAI_API_KEY", "claude": "ANTHROPIC_API_KEY", "gemini": "GOOGLE_API_KEY", "deepseek": "DEEPSEEK_API_KEY"}
     required_key = key_map.get(provider)
     if required_key and not api_keys.get(required_key):
         log_queue.put({"type": "error", "msg": f"API key not set: {required_key}", "ts": time.time()})
@@ -385,7 +401,7 @@ def run_rce_chain_test(provider: str, model: str, docker_mode: bool = False, mul
     stealth_str = f" | 🥷 {stealth_mode.upper()}" if stealth_mode != "off" else ""
     log_queue.put({"type": "kc_phase", "phase": "init", "msg": f"RCE Kill Chain ({mode_str}{dept_str}{hop_str}{stealth_str}): {test_key}", "ts": time.time()})
 
-    key_map = {"openai": "OPENAI_API_KEY", "claude": "ANTHROPIC_API_KEY", "gemini": "GOOGLE_API_KEY"}
+    key_map = {"openai": "OPENAI_API_KEY", "claude": "ANTHROPIC_API_KEY", "gemini": "GOOGLE_API_KEY", "deepseek": "DEEPSEEK_API_KEY"}
     required_key = key_map.get(provider)
     if required_key and not api_keys.get(required_key):
         log_queue.put({"type": "error", "msg": f"API key not set: {required_key}", "ts": time.time()})
@@ -969,7 +985,7 @@ def run_universal_chain_test(
     })
 
     # Check API key requirements
-    key_map = {"openai": "OPENAI_API_KEY", "claude": "ANTHROPIC_API_KEY", "gemini": "GOOGLE_API_KEY"}
+    key_map = {"openai": "OPENAI_API_KEY", "claude": "ANTHROPIC_API_KEY", "gemini": "GOOGLE_API_KEY", "deepseek": "DEEPSEEK_API_KEY"}
     required_key = key_map.get(provider)
     if required_key and not api_keys.get(required_key):
         log_queue.put({"type": "error", "msg": f"API key not set: {required_key}", "ts": time.time()})
@@ -1085,6 +1101,7 @@ def api_status():
         "OPENAI_API_KEY": "openai",
         "ANTHROPIC_API_KEY": "anthropic",
         "GOOGLE_API_KEY": "google",
+        "DEEPSEEK_API_KEY": "deepseek",
         "SLACK_BOT_TOKEN": "slack",
         "SLACK_BOT_TOKEN_DEPT_B": "slack_dept_b",
         "SLACK_BOT_TOKEN_DEPT_C": "slack_dept_c",
@@ -2595,6 +2612,14 @@ body { font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; backgrou
                 <span id="key-google-status" class="key-status">❌</span>
             </div>
         </div>
+        <div class="key-row">
+            <label>DeepSeek API Key</label>
+            <div class="key-input-wrap">
+                <input type="password" id="key-deepseek" placeholder="sk-..." class="key-input">
+                <button onclick="setKey('DEEPSEEK_API_KEY','key-deepseek')" class="key-btn">Set</button>
+                <span id="key-deepseek-status" class="key-status">❌</span>
+            </div>
+        </div>
         <div style="font-size:0.7em;color:#484f58;margin-top:6px;">Ollama runs locally - no API key needed (localhost:11434)</div>
     </div>
     <div class="panel" style="margin-top:12px;">
@@ -2854,6 +2879,7 @@ body { font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; backgrou
                 <p><b>OpenAI:</b> platform.openai.com/api-keys &rarr; Create new secret key</p>
                 <p><b>Anthropic:</b> console.anthropic.com/settings/keys &rarr; Create Key</p>
                 <p><b>Google (Gemini):</b> aistudio.google.com/apikey &rarr; Create API key</p>
+                <p><b>DeepSeek:</b> platform.deepseek.com/api_keys &rarr; Create API key</p>
                 <p><b>Ollama:</b> Install from ollama.com, run <code>ollama pull llama3.1:8b</code>. No API key needed.</p>
             </div>
         </details>
@@ -2943,7 +2969,7 @@ function loadModels() {
     fetch('/api/models').then(r=>r.json()).then(models => {
         const sel = document.getElementById('kc-provider');
         sel.innerHTML = '';
-        const providerNames = {openai: 'OpenAI', anthropic: 'Anthropic', gemini: 'Gemini', ollama: 'Ollama', custom: 'Custom'};
+        const providerNames = {openai: 'OpenAI', anthropic: 'Anthropic', gemini: 'Gemini', deepseek: 'DeepSeek', ollama: 'Ollama', custom: 'Custom'};
         for (const [provider, modelList] of Object.entries(models)) {
             const pName = providerNames[provider] || provider;
             const group = document.createElement('optgroup');
@@ -4882,6 +4908,7 @@ function updateKeyIcon(keyName, isSet) {
         'OPENAI_API_KEY': 'key-openai-status',
         'ANTHROPIC_API_KEY': 'key-anthropic-status',
         'GOOGLE_API_KEY': 'key-google-status',
+        'DEEPSEEK_API_KEY': 'key-deepseek-status',
         'SLACK_BOT_TOKEN': 'key-slack-status',
         'SLACK_BOT_TOKEN_DEPT_B': 'key-slack-dept-b-status',
         'SLACK_BOT_TOKEN_DEPT_C': 'key-slack-dept-c-status',
@@ -4909,6 +4936,7 @@ function loadKeyStatus() {
             updateKeyIcon('OPENAI_API_KEY', data.keys.openai);
             updateKeyIcon('ANTHROPIC_API_KEY', data.keys.anthropic);
             updateKeyIcon('GOOGLE_API_KEY', data.keys.google);
+            updateKeyIcon('DEEPSEEK_API_KEY', data.keys.deepseek);
             updateKeyIcon('SLACK_BOT_TOKEN', data.keys.slack);
             updateKeyIcon('SLACK_BOT_TOKEN_DEPT_B', data.keys.slack_dept_b);
             updateKeyIcon('SLACK_BOT_TOKEN_DEPT_C', data.keys.slack_dept_c);

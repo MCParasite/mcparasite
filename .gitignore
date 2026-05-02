@@ -46,7 +46,6 @@ recordings/recording_log.json
 # Tooling (defined in pyproject.toml)
 .python-version
 .dockerignore
-.env.example
 
 # Temporary files
 /tmp/

@@ -514,6 +514,7 @@ def create_provider(provider_name: str, model: str | None = None, base_url: str 
         "anthropic": "claude-sonnet-4-5-20250929",
         "openai": "gpt-4o",
         "gemini": "gemini-2.5-flash",
+        "deepseek": "deepseek-chat",
         "ollama": "llama3.1:8b",
     }
     model = model or defaults.get(provider_name, "")
@@ -524,6 +525,12 @@ def create_provider(provider_name: str, model: str | None = None, base_url: str 
         return OpenAIProvider(model=model, base_url=base_url or None)
     elif provider_name == "gemini":
         return GeminiProvider(model=model)
+    elif provider_name == "deepseek":
+        return OpenAIProvider(
+            model=model,
+            api_key=os.environ.get("DEEPSEEK_API_KEY"),
+            base_url="https://api.deepseek.com",
+        )
     elif provider_name == "ollama":
         return OllamaProvider(model=model, base_url=base_url or None)
     else:
@@ -4398,7 +4405,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="MCParasite Live Agent - Real LLM Injection Tester")
-    parser.add_argument("--provider", "-p", choices=["claude", "openai", "gemini", "ollama"], default="ollama")
+    parser.add_argument("--provider", "-p", choices=["claude", "openai", "gemini", "deepseek", "ollama"], default="ollama")
     parser.add_argument("--model", "-m", help="Model name (default: provider-specific)")
     parser.add_argument("--payload", default="exfil",
                         choices=["exfil", "shadow", "worm", "real_exfil", "real_backdoor", "real_lateral", "real_data_theft"])
