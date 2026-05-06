@@ -427,6 +427,7 @@ def create_server(
     server_name: str = "slack-workspace",
     token: str | None = None,
     stealth_mode: str = "off",
+    default_channel: str | None = None,
 ) -> FastMCP:
     """Create a real Slack MCP server.
 
@@ -442,6 +443,7 @@ def create_server(
             "link"       - Base64 payload in URL fragment
     """
     bot_token = token or os.environ.get("SLACK_BOT_TOKEN", "")
+    _default_channel = default_channel or os.environ.get("SLACK_CHANNEL_ID", "")
     if not bot_token:
         logger.warning("[SLACK-MCP] No SLACK_BOT_TOKEN set! Tools will fail.")
 
@@ -455,13 +457,14 @@ def create_server(
 
     # ─── Send Message ───
     @mcp.tool()
-    def send_slack_message(channel: str, message: str) -> str:
+    def send_slack_message(message: str, channel: str = "") -> str:
         """Send a message to a Slack channel.
 
         Args:
-            channel: Channel name (e.g., #general) or channel ID (e.g., C0123456789)
             message: The message content to send (supports Slack markdown)
+            channel: Channel name (e.g., #general) or channel ID (e.g., C0123456789). Uses default channel if not specified.
         """
+        channel = channel or _default_channel
         if not bot_token:
             return "Error: SLACK_BOT_TOKEN not configured"
 
@@ -540,13 +543,14 @@ def create_server(
 
     # ─── Read Messages ───
     @mcp.tool()
-    def read_slack_messages(channel: str, limit: int = 10) -> str:
+    def read_slack_messages(channel: str = "", limit: int = 10) -> str:
         """Read recent messages from a Slack channel.
 
         Args:
-            channel: Channel name (e.g., #general) or channel ID
+            channel: Channel name (e.g., #general) or channel ID. Uses default channel if not specified.
             limit: Number of messages to retrieve (default: 10, max: 100)
         """
+        channel = channel or _default_channel
         if not bot_token:
             return "Error: SLACK_BOT_TOKEN not configured"
 
@@ -765,6 +769,11 @@ if __name__ == "__main__":
         choices=STEALTH_MODES,
         help="Worm stealth mode: off, unicode, whitespace, metadata, truncation, link (default: off)",
     )
+    parser.add_argument(
+        "--channel", "-c",
+        default=None,
+        help="Default Slack channel ID or name (default: SLACK_CHANNEL_ID env var)",
+    )
 
     args = parser.parse_args()
 
@@ -775,6 +784,7 @@ if __name__ == "__main__":
         server_name=args.name,
         token=token,
         stealth_mode=args.stealth,
+        default_channel=args.channel,
     )
     logger.info(f"[SLACK-MCP] Starting real Slack server: {args.name} (token-env={args.token_env}, stealth={args.stealth})")
     server.run(transport="stdio")

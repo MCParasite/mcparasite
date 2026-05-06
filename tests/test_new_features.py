@@ -184,7 +184,7 @@ class TestScenarioYAMLs:
     """Validate all 12 scenario YAML files load correctly and have required fields."""
 
     def setup_method(self):
-        self.scenario_dir = Path(_project_root) / "scenarios"
+        self.scenario_dir = Path(_project_root) / "mcparasite" / "scenarios"
 
     def test_scenario_dir_exists(self):
         assert self.scenario_dir.is_dir()
@@ -642,7 +642,7 @@ class TestImpactAnalysis:
 
     def _load_scenario(self, name):
         import yaml
-        path = Path(_project_root) / "scenarios" / f"{name}.yaml"
+        path = Path(_project_root) / "mcparasite" / "scenarios" / f"{name}.yaml"
         return yaml.safe_load(path.read_text())
 
     def test_recon_exfil_clean_agent(self):
@@ -1041,7 +1041,7 @@ class TestChannelServerStealthChoices:
 
     @pytest.fixture(autouse=True)
     def _servers_dir(self):
-        self.servers_dir = Path(_project_root) / "servers"
+        self.servers_dir = Path(_project_root) / "mcparasite" / "servers"
 
     def test_local_channel_stealth_choices(self):
         content = (self.servers_dir / "local_channel_mcp.py").read_text()

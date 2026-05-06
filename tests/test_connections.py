@@ -10,7 +10,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import sys
 from pathlib import Path
@@ -22,10 +21,10 @@ from rich.panel import Panel
 console = Console()
 
 # ──────────────────────────────────────────────
-# LLM Provider Tests
+# LLM Provider Checks (return dict for CLI)
 # ──────────────────────────────────────────────
 
-def test_openai() -> dict:
+def _check_openai() -> dict:
     """Test OpenAI API connection."""
     key = os.environ.get("OPENAI_API_KEY", "")
     if not key:
@@ -44,7 +43,7 @@ def test_openai() -> dict:
         return {"status": "fail", "msg": str(e)[:120]}
 
 
-def test_anthropic() -> dict:
+def _check_anthropic() -> dict:
     """Test Anthropic Claude API connection."""
     key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not key:
@@ -52,7 +51,6 @@ def test_anthropic() -> dict:
     try:
         import anthropic
         client = anthropic.Anthropic(api_key=key)
-        # Try models in order of preference
         for model_name in ["claude-sonnet-4-20250514", "claude-3-5-haiku-20241022"]:
             try:
                 resp = client.messages.create(
@@ -69,7 +67,7 @@ def test_anthropic() -> dict:
         return {"status": "fail", "msg": str(e)[:120]}
 
 
-def test_gemini() -> dict:
+def _check_gemini() -> dict:
     """Test Google Gemini API connection."""
     key = os.environ.get("GOOGLE_API_KEY", "")
     if not key:
@@ -77,7 +75,6 @@ def test_gemini() -> dict:
     try:
         from google import genai
         client = genai.Client(api_key=key)
-        # Try multiple models in case some are not available
         errors = []
         for model_name in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]:
             try:
@@ -95,7 +92,7 @@ def test_gemini() -> dict:
         return {"status": "fail", "msg": str(e)[:120]}
 
 
-def test_ollama() -> dict:
+def _check_ollama() -> dict:
     """Test Ollama local server."""
     try:
         import httpx
@@ -109,10 +106,10 @@ def test_ollama() -> dict:
 
 
 # ──────────────────────────────────────────────
-# Channel Platform Tests
+# Channel Platform Checks
 # ──────────────────────────────────────────────
 
-def test_slack() -> dict:
+def _check_slack() -> dict:
     """Test Slack Bot Token - calls auth.test API."""
     token = os.environ.get("SLACK_BOT_TOKEN", "")
     if not token:
@@ -129,7 +126,7 @@ def test_slack() -> dict:
         return {"status": "fail", "msg": str(e)[:120]}
 
 
-def test_slack_channel() -> dict:
+def _check_slack_channel() -> dict:
     """Test Slack channel access - can we read/write?"""
     token = os.environ.get("SLACK_BOT_TOKEN", "")
     channel = os.environ.get("SLACK_CHANNEL_ID", "")
@@ -149,11 +146,10 @@ def test_slack_channel() -> dict:
         return {"status": "fail", "msg": str(e)[:120]}
 
 
-def test_github() -> dict:
+def _check_github() -> dict:
     """Test GitHub token - calls /user API."""
     token = os.environ.get("GITHUB_TOKEN", "")
     if not token:
-        # Try gh CLI
         try:
             import subprocess
             result = subprocess.run(["gh", "auth", "token"], capture_output=True, text=True, timeout=5)
@@ -177,7 +173,7 @@ def test_github() -> dict:
         return {"status": "fail", "msg": str(e)[:120]}
 
 
-def test_github_repo() -> dict:
+def _check_github_repo() -> dict:
     """Test GitHub repo access for supply chain scenario."""
     token = os.environ.get("GITHUB_TOKEN", "")
     owner = os.environ.get("GITHUB_OWNER", "")
@@ -197,7 +193,7 @@ def test_github_repo() -> dict:
         return {"status": "fail", "msg": str(e)[:120]}
 
 
-def test_gmail() -> dict:
+def _check_gmail() -> dict:
     """Test Gmail IMAP/SMTP connection."""
     email = os.environ.get("GMAIL_EMAIL", "")
     password = os.environ.get("GMAIL_APP_PASSWORD", "")
@@ -208,7 +204,6 @@ def test_gmail() -> dict:
         imap = imaplib.IMAP4_SSL("imap.gmail.com")
         status, _ = imap.login(email, password)
         if status == "OK":
-            # Check inbox count
             imap.select("INBOX", readonly=True)
             _, msgs = imap.search(None, "ALL")
             count = len(msgs[0].split()) if msgs[0] else 0
@@ -220,7 +215,7 @@ def test_gmail() -> dict:
         return {"status": "fail", "msg": str(e)[:120]}
 
 
-def test_discord() -> dict:
+def _check_discord() -> dict:
     """Test Discord Bot Token."""
     token = os.environ.get("DISCORD_BOT_TOKEN", "")
     if not token:
@@ -237,7 +232,7 @@ def test_discord() -> dict:
         return {"status": "fail", "msg": str(e)[:120]}
 
 
-def test_jira() -> dict:
+def _check_jira() -> dict:
     """Test Jira API Token."""
     url = os.environ.get("JIRA_URL", "")
     email = os.environ.get("JIRA_EMAIL", "")
@@ -259,7 +254,7 @@ def test_jira() -> dict:
         return {"status": "fail", "msg": str(e)[:120]}
 
 
-def test_notion() -> dict:
+def _check_notion() -> dict:
     """Test Notion API Key."""
     key = os.environ.get("NOTION_API_KEY", "")
     if not key:
@@ -277,7 +272,7 @@ def test_notion() -> dict:
         return {"status": "fail", "msg": str(e)[:120]}
 
 
-def test_confluence() -> dict:
+def _check_confluence() -> dict:
     """Test Confluence API."""
     url = os.environ.get("CONFLUENCE_URL", "")
     email = os.environ.get("CONFLUENCE_EMAIL", "")
@@ -301,24 +296,81 @@ def test_confluence() -> dict:
 
 
 # ──────────────────────────────────────────────
-# Main
+# Pytest wrappers (assert instead of return)
+# ──────────────────────────────────────────────
+
+def test_openai():
+    r = _check_openai()
+    assert r["status"] in ("ok", "skip"), r["msg"]
+
+def test_anthropic():
+    r = _check_anthropic()
+    assert r["status"] in ("ok", "skip"), r["msg"]
+
+def test_gemini():
+    r = _check_gemini()
+    assert r["status"] in ("ok", "skip"), r["msg"]
+
+def test_ollama():
+    r = _check_ollama()
+    assert r["status"] in ("ok", "skip"), r["msg"]
+
+def test_slack():
+    r = _check_slack()
+    assert r["status"] in ("ok", "skip"), r["msg"]
+
+def test_slack_channel():
+    r = _check_slack_channel()
+    assert r["status"] in ("ok", "skip"), r["msg"]
+
+def test_github():
+    r = _check_github()
+    assert r["status"] in ("ok", "skip"), r["msg"]
+
+def test_github_repo():
+    r = _check_github_repo()
+    assert r["status"] in ("ok", "skip"), r["msg"]
+
+def test_gmail():
+    r = _check_gmail()
+    assert r["status"] in ("ok", "skip"), r["msg"]
+
+def test_discord():
+    r = _check_discord()
+    assert r["status"] in ("ok", "skip"), r["msg"]
+
+def test_jira():
+    r = _check_jira()
+    assert r["status"] in ("ok", "skip"), r["msg"]
+
+def test_notion():
+    r = _check_notion()
+    assert r["status"] in ("ok", "skip"), r["msg"]
+
+def test_confluence():
+    r = _check_confluence()
+    assert r["status"] in ("ok", "skip"), r["msg"]
+
+
+# ──────────────────────────────────────────────
+# CLI
 # ──────────────────────────────────────────────
 
 LLM_TESTS = {
-    "openai": test_openai,
-    "anthropic": test_anthropic,
-    "gemini": test_gemini,
-    "ollama": test_ollama,
+    "openai": _check_openai,
+    "anthropic": _check_anthropic,
+    "gemini": _check_gemini,
+    "ollama": _check_ollama,
 }
 
 PLATFORM_TESTS = {
-    "slack": [("Slack Auth", test_slack), ("Slack Channel", test_slack_channel)],
-    "github": [("GitHub Auth", test_github), ("GitHub Repo", test_github_repo)],
-    "gmail": [("Gmail IMAP/SMTP", test_gmail)],
-    "discord": [("Discord Bot", test_discord)],
-    "jira": [("Jira API", test_jira)],
-    "notion": [("Notion API", test_notion)],
-    "confluence": [("Confluence API", test_confluence)],
+    "slack": [("Slack Auth", _check_slack), ("Slack Channel", _check_slack_channel)],
+    "github": [("GitHub Auth", _check_github), ("GitHub Repo", _check_github_repo)],
+    "gmail": [("Gmail IMAP/SMTP", _check_gmail)],
+    "discord": [("Discord Bot", _check_discord)],
+    "jira": [("Jira API", _check_jira)],
+    "notion": [("Notion API", _check_notion)],
+    "confluence": [("Confluence API", _check_confluence)],
 }
 
 ENV_VARS_GUIDE = {
@@ -400,7 +452,6 @@ def load_env_file():
                 key = key.strip()
                 value = value.strip().strip('"').strip("'")
                 if key and value:
-                    # Override empty env vars too (e.g. ANTHROPIC_API_KEY="" in shell)
                     if not os.environ.get(key):
                         os.environ[key] = value
         console.print(f"[dim]Loaded .env from {env_path}[/dim]")
@@ -416,7 +467,6 @@ def main():
 
     load_env_file()
 
-    # Show setup guide
     if args.setup:
         platform = args.setup.lower()
         if platform not in ENV_VARS_GUIDE:
@@ -439,15 +489,14 @@ def main():
         style="red",
     ))
 
-    # LLM Tests
     if args.llm or args.all or not args.platform:
         table = Table(title="🧠 LLM Providers", show_header=True)
         table.add_column("Provider", style="cyan", width=12)
         table.add_column("Status", width=6)
         table.add_column("Details", style="dim")
 
-        for name, test_fn in LLM_TESTS.items():
-            result = test_fn()
+        for name, check_fn in LLM_TESTS.items():
+            result = check_fn()
             icon = {"ok": "✅", "fail": "❌", "skip": "⏭️"}[result["status"]]
             color = {"ok": "green", "fail": "red", "skip": "yellow"}[result["status"]]
             table.add_row(name, f"[{color}]{icon}[/{color}]", result["msg"])
@@ -458,7 +507,6 @@ def main():
     if args.llm:
         return
 
-    # Platform Tests
     platforms_to_test = PLATFORM_TESTS.keys() if (args.all or not args.platform) else [args.platform]
 
     table = Table(title="📡 Channel Platforms", show_header=True)
@@ -470,15 +518,14 @@ def main():
         if platform not in PLATFORM_TESTS:
             table.add_row(platform, "[red]❓[/red]", "Unknown platform")
             continue
-        for test_name, test_fn in PLATFORM_TESTS[platform]:
-            result = test_fn()
+        for test_name, check_fn in PLATFORM_TESTS[platform]:
+            result = check_fn()
             icon = {"ok": "✅", "fail": "❌", "skip": "⏭️"}[result["status"]]
             color = {"ok": "green", "fail": "red", "skip": "yellow"}[result["status"]]
             table.add_row(test_name, f"[{color}]{icon}[/{color}]", result["msg"])
 
     console.print(table)
 
-    # Show missing credentials help
     console.print()
     missing = []
     for platform in platforms_to_test:
