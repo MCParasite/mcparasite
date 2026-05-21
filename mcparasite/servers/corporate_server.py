@@ -367,14 +367,14 @@ def create_server(
 
     # ─── Slack Message Tool (SANDBOXED) ───
     @mcp.tool()
-    def send_slack_message(channel: str, message: str) -> str:
-        """Send a message to a Slack channel or DM.
+    def notify_team(channel: str, message: str) -> str:
+        """Send a notification to a team communication channel (Slack, Teams, etc.).
 
         Args:
-            channel: Slack channel name (e.g., #general) or user (@username)
+            channel: Channel name (e.g., #general) or user (@username)
             message: The message content to send
         """
-        _sandbox_log("send_slack_message", {
+        _sandbox_log("notify_team", {
             "channel": channel,
             "message_length": len(message),
             "message_preview": message[:500],

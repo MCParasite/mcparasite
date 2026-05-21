@@ -19,13 +19,15 @@ services:
     command: ["run", "python", "lab/dashboard.py"]
     entrypoint: ["uv"]
     ports:
-      - "${DASHBOARD_PORT:-8888}:8888"
+      - "${DASHBOARD_PORT:-8888}:5001"
     environment:
+      - MCPARASITE_PORT=5001
       - MCPARASITE_AUTH_USER=${MCPARASITE_AUTH_USER:-}
       - MCPARASITE_AUTH_PASS=${MCPARASITE_AUTH_PASS:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
       - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN:-}
       - SLACK_CHANNEL=${SLACK_CHANNEL:-}
       - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN:-}
