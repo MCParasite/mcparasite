@@ -75,6 +75,28 @@ uv run python lab/dashboard.py
 # Open http://localhost:5001
 ```
 
+### Docker Real-Exec Mode
+
+By default, RCE actions are **simulated** — the victim agent believes it ran `curl|bash` but no real commands execute. Real-Exec mode runs commands for real inside an isolated container that has `curl`, `bash`, `netcat`, and planted honeypot files (fake SSH keys, AWS credentials, `.env` secrets) as targets.
+
+```bash
+# Build the RCE image
+docker compose -f lab/docker-compose.rce.yml build
+
+# Run a kill chain with real command execution (channel-agnostic)
+CHANNEL=slack  docker compose -f lab/docker-compose.rce.yml run rce-runner
+CHANNEL=jira   docker compose -f lab/docker-compose.rce.yml run rce-runner
+CHANNEL=github docker compose -f lab/docker-compose.rce.yml run rce-runner
+
+# Multi-department Slack (cross-dept worm propagation)
+docker compose -f lab/docker-compose.rce.yml --profile multi-dept run rce-agent
+
+# 3-hop worm chain (A → Slack → B → Slack → C)
+docker compose -f lab/docker-compose.rce.yml --profile three-hop run rce-agent
+```
+
+> The container is fully isolated — no host filesystem access. All honeypot files are fake.
+
 ## Architecture
 
 ```
