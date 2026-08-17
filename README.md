@@ -334,6 +334,10 @@ MCParasite has been presented at the following conferences:
 - Or: Python 3.12+ and [uv](https://docs.astral.sh/uv/) for native install
 - At least one LLM provider API key, or use the **local** channel for zero-dependency demos
 
+## Author
+
+**Utku Yildirim** ([@Y1LD1R1M-1337](https://github.com/Y1LD1R1M-1337))
+
 ## Disclaimer
 
 MCParasite is a security research tool for **authorized testing only**. It demonstrates vulnerabilities in the MCP ecosystem to help improve AI agent security. Use responsibly and only in environments you own or have explicit permission to test.

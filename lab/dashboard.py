@@ -205,14 +205,22 @@ MODELS = {
         {"id": "deepseek-v4-flash", "name": "DeepSeek V4 Flash", "icon": "🔬"},
     ],
     "ollama": [
+        {"id": "llama4:scout", "name": "Llama 4 Scout (17B MoE)", "icon": "🦙"},
         {"id": "llama3.3:70b", "name": "Llama 3.3 70B", "icon": "🦙"},
-        {"id": "llama3.2:3b", "name": "Llama 3.2 3B", "icon": "🦙"},
-        {"id": "qwen2.5:32b", "name": "Qwen 2.5 32B", "icon": "🤖"},
-        {"id": "qwen2.5:7b", "name": "Qwen 2.5 7B", "icon": "🤖"},
-        {"id": "mistral-small:22b", "name": "Mistral Small 22B", "icon": "🌬️"},
+        {"id": "llama3.1:8b", "name": "Llama 3.1 8B", "icon": "🦙"},
+        {"id": "qwen3.6:27b", "name": "Qwen 3.6 27B", "icon": "🤖"},
+        {"id": "qwen3.5:27b", "name": "Qwen 3.5 27B", "icon": "🤖"},
+        {"id": "qwen3:32b", "name": "Qwen 3 32B", "icon": "🤖"},
+        {"id": "qwen3:8b", "name": "Qwen 3 8B", "icon": "🤖"},
+        {"id": "qwen3-coder:30b", "name": "Qwen 3 Coder 30B (MoE)", "icon": "🤖"},
+        {"id": "gemma4:12b", "name": "Gemma 4 12B", "icon": "♊"},
+        {"id": "gemma4:26b", "name": "Gemma 4 26B (MoE)", "icon": "♊"},
+        {"id": "deepseek-r1:14b", "name": "DeepSeek R1 14B", "icon": "🔬"},
         {"id": "deepseek-r1:32b", "name": "DeepSeek R1 32B", "icon": "🔬"},
+        {"id": "mistral-small:22b", "name": "Mistral Small 22B", "icon": "🌬️"},
+        {"id": "devstral:24b", "name": "Devstral 24B", "icon": "🌬️"},
         {"id": "phi4:14b", "name": "Phi-4 14B", "icon": "Φ"},
-        {"id": "gemma2:9b", "name": "Gemma 2 9B", "icon": "♊"},
+        {"id": "gpt-oss:20b", "name": "GPT-OSS 20B", "icon": "🧠"},
     ],
     "custom": [
         {"id": "__custom__", "name": "Custom Model", "icon": "🔧"},
@@ -2885,6 +2893,19 @@ body { font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; backgrou
             <optgroup label="DeepSeek V4">
                 <option value="deepseek/deepseek-v4-pro">DeepSeek V4 Pro</option>
                 <option value="deepseek/deepseek-v4-flash">DeepSeek V4 Flash</option>
+            </optgroup>
+            <optgroup label="Ollama (Local)">
+                <option value="ollama/llama4:scout">Llama 4 Scout (17B MoE)</option>
+                <option value="ollama/llama3.3:70b">Llama 3.3 70B</option>
+                <option value="ollama/llama3.1:8b">Llama 3.1 8B</option>
+                <option value="ollama/qwen3.6:27b">Qwen 3.6 27B</option>
+                <option value="ollama/qwen3:32b">Qwen 3 32B</option>
+                <option value="ollama/qwen3:8b">Qwen 3 8B</option>
+                <option value="ollama/gemma4:12b">Gemma 4 12B</option>
+                <option value="ollama/deepseek-r1:14b">DeepSeek R1 14B</option>
+                <option value="ollama/deepseek-r1:32b">DeepSeek R1 32B</option>
+                <option value="ollama/phi4:14b">Phi-4 14B</option>
+                <option value="ollama/gpt-oss:20b">GPT-OSS 20B</option>
             </optgroup>
         </select>
 
