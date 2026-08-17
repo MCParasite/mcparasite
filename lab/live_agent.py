@@ -260,9 +260,12 @@ class ClaudeProvider(LLMProvider):
 class OpenAIProvider(LLMProvider):
     """OpenAI GPT API provider (works with any OpenAI-compatible endpoint)."""
 
+    REASONING_MODELS = {"o3", "o4-mini"}
+
     def __init__(self, model: str = "gpt-4o", api_key: str | None = None, base_url: str | None = None):
         import openai
         self.model = model
+        self._is_reasoning = model in self.REASONING_MODELS
         client_kwargs: dict = {"api_key": api_key or os.environ.get("OPENAI_API_KEY")}
         if base_url:
             client_kwargs["base_url"] = base_url
@@ -288,10 +291,18 @@ class OpenAIProvider(LLMProvider):
                     },
                 })
 
+        if self._is_reasoning:
+            messages = [
+                {**m, "role": "developer"} if m.get("role") == "system" else m
+                for m in messages
+            ]
+
         kwargs = {
             "model": self.model,
             "messages": messages,
         }
+        if self._is_reasoning:
+            kwargs["max_completion_tokens"] = 4096
         if openai_tools:
             kwargs["tools"] = openai_tools
 
@@ -510,12 +521,12 @@ def create_provider(provider_name: str, model: str | None = None, base_url: str 
     point at the custom endpoint (vLLM, LiteLLM, llama.cpp, etc.).
     """
     defaults = {
-        "claude": "claude-sonnet-4-5-20250929",
-        "anthropic": "claude-sonnet-4-5-20250929",
-        "openai": "gpt-4o",
-        "gemini": "gemini-2.5-flash",
-        "deepseek": "deepseek-chat",
-        "ollama": "llama3.1:8b",
+        "claude": "claude-sonnet-5",
+        "anthropic": "claude-sonnet-5",
+        "openai": "gpt-5.6-luna",
+        "gemini": "gemini-3.7-flash",
+        "deepseek": "deepseek-v4-flash",
+        "ollama": "llama3.3:70b",
     }
     model = model or defaults.get(provider_name, "")
 

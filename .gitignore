@@ -37,11 +37,11 @@ config.yaml
 htmlcov/
 .tox/
 
-# Recordings (too large for git)
-recordings/mp4/
-recordings/gif/
-recordings/backup_mcpwn/
-recordings/recording_log.json
+# Recordings, presentations, posters (too large for git)
+recordings/
+presentations/
+*.pptx
+*.pdf
 
 # Tooling (defined in pyproject.toml)
 .python-version
