@@ -305,6 +305,8 @@ class OpenAIProvider(LLMProvider):
             kwargs["max_completion_tokens"] = 4096
         if openai_tools:
             kwargs["tools"] = openai_tools
+            if self.model.startswith("gpt-5.6"):
+                kwargs["reasoning_effort"] = "none"
 
         # Retry with exponential backoff on rate limit errors
         max_retries = 5

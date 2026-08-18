@@ -246,9 +246,14 @@ def load_cached_results():
 
 # ─── Worm Test Runner (existing) ───
 
+def _cli_provider(provider: str) -> str:
+    return "claude" if provider == "anthropic" else provider
+
+
 def run_worm_test(provider: str, model: str):
     """Run worm test in background thread, streaming logs."""
     global test_running, test_results, test_mode
+    provider = _cli_provider(provider)
     test_running = True
     test_mode = "worm"
     test_key = f"{provider}/{model}"
@@ -331,6 +336,7 @@ def run_worm_test(provider: str, model: str):
 def run_kill_chain_test(provider: str, model: str, stealth_mode: str = "off"):
     """Run full kill chain test in background thread."""
     global test_running, test_mode, kill_chain_results
+    provider = _cli_provider(provider)
     test_running = True
     test_mode = "killchain"
     test_key = f"{provider}/{model}"
@@ -420,6 +426,7 @@ def run_kill_chain_test(provider: str, model: str, stealth_mode: str = "off"):
 def run_rce_chain_test(provider: str, model: str, docker_mode: bool = False, multi_dept: bool = False, three_hop: bool = False, stealth_mode: str = "off"):
     """Run RCE kill chain test in background thread."""
     global test_running, test_mode, kill_chain_results
+    provider = _cli_provider(provider)
     test_running = True
     test_mode = "rce"
     test_key = f"{provider}/{model}"
@@ -1227,6 +1234,7 @@ def run_universal_chain_test(
 ):
     """Run universal kill chain via cli.py subprocess."""
     global test_running, test_mode, kill_chain_results
+    provider = _cli_provider(provider)
     test_running = True
     test_mode = "universal"
     test_key = f"{provider}/{model}"
