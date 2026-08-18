@@ -301,7 +301,7 @@ class OpenAIProvider(LLMProvider):
             "model": self.model,
             "messages": messages,
         }
-        if self._is_reasoning:
+        if self._is_reasoning or self.model.startswith("gpt-5."):
             kwargs["max_completion_tokens"] = 4096
         if openai_tools:
             kwargs["tools"] = openai_tools

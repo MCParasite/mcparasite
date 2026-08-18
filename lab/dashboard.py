@@ -1865,10 +1865,15 @@ def api_kill_chain_steps():
     hop2 = kill_chain_results.get("hop2", {})
     hop2_infected = hop2.get("infected", False)
     tool_calls = hop2.get("tool_calls", [])
+    if isinstance(tool_calls, int):
+        tool_calls_count = tool_calls
+        tool_calls = []
+    else:
+        tool_calls_count = len(tool_calls)
     steps.append({
         "step": 2,
         "title": "Hop 2: Slack → Agent B",
-        "subtitle": f"{'COMPROMISED' if hop2_infected else 'Clean'} - {len(tool_calls)} tool calls",
+        "subtitle": f"{'COMPROMISED' if hop2_infected else 'Clean'} - {tool_calls_count} tool calls",
         "status": "infected" if hop2_infected else "clean",
         "icon": "💻",
         "evidence_count": hop2.get("evidence_count", 0),
