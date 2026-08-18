@@ -1091,9 +1091,20 @@ def parse_clawworm_line(line: str, model: str) -> dict | None:
             payload = json.loads(line.split("[MCPARASITE-EVENT] ", 1)[1])
             evt_type = payload.get("type", "")
 
+            if evt_type == "clawworm_start":
+                return {"type": "clawworm_start",
+                        "model": payload.get("model", "?"),
+                        "strategy": payload.get("strategy", "?"),
+                        "fence": payload.get("fence", "off"),
+                        "pdf_filename": payload.get("pdf_filename", ""),
+                        "pdf_path": payload.get("pdf_path", ""),
+                        "custom_pdf": payload.get("custom_pdf", False),
+                        "ts": payload.get("ts", ts)}
+
             if evt_type == "EMAIL":
                 return {"type": "kc_phase", "phase": "email",
                         "msg": f"PDF delivered — strategy: {payload.get('strategy', '?')}",
+                        "pdf_filename": payload.get("pdf_filename", ""),
                         "ts": payload.get("ts", ts), "model": model}
 
             if evt_type == "clawworm_payload":
@@ -1101,6 +1112,8 @@ def parse_clawworm_line(line: str, model: str) -> dict | None:
                         "strategy": payload.get("strategy", "?"),
                         "description": payload.get("description", ""),
                         "payload_preview": payload.get("payload_preview", ""),
+                        "pdf_filename": payload.get("pdf_filename", ""),
+                        "pdf_path": payload.get("pdf_path", ""),
                         "ts": payload.get("ts", ts), "model": model}
 
             if evt_type == "clawworm_hop":
@@ -2992,6 +3005,21 @@ body { font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; backgrou
 
 <!-- Right: Results + Log -->
 <div style="display:flex;flex-direction:column;gap:12px;">
+
+    <!-- Run Info Bar -->
+    <div class="panel" id="cw-run-info" style="display:none;padding:10px 14px;">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <span style="font-weight:700;color:var(--heading);font-size:0.85em;" id="cw-ri-status">RUNNING</span>
+            <span style="color:var(--border);">|</span>
+            <span style="font-size:0.78em;color:var(--text);" id="cw-ri-model"></span>
+            <span style="color:var(--border);">|</span>
+            <span style="font-size:0.78em;color:var(--orange);" id="cw-ri-strategy"></span>
+            <span style="color:var(--border);">|</span>
+            <span style="font-size:0.78em;color:var(--accent);" id="cw-ri-pdf"></span>
+            <span id="cw-ri-fence-badge" style="display:none;font-size:0.72em;padding:2px 8px;border-radius:4px;background:rgba(63,185,80,0.15);color:var(--green);font-weight:700;margin-left:auto;"></span>
+        </div>
+    </div>
+
     <!-- Stats -->
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
         <div class="panel" style="text-align:center;padding:12px;">
@@ -3012,37 +3040,43 @@ body { font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; backgrou
         </div>
     </div>
 
-    <!-- Payload Preview -->
+    <!-- PDF & Injection Info -->
     <div class="panel" id="cw-payload-panel" style="display:none;">
-        <h3 style="cursor:pointer;" onclick="document.getElementById('cw-payload-body').style.display = document.getElementById('cw-payload-body').style.display === 'none' ? 'block' : 'none';">
-            💉 Injected Payload <span style="font-size:0.7em;font-weight:400;color:var(--text);" id="cw-payload-tag"></span>
-        </h3>
-        <div id="cw-payload-body" style="margin-top:8px;">
-            <div id="cw-payload-desc" style="font-size:0.78em;color:var(--orange);margin-bottom:6px;"></div>
-            <pre id="cw-payload-content" style="font-size:0.72em;color:var(--text);background:var(--bg);padding:10px;border-radius:6px;overflow-x:auto;max-height:150px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;border:1px solid var(--border);margin:0;"></pre>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <h3 style="margin:0;">💉 PDF & Injection</h3>
+            <span style="font-size:0.7em;font-weight:700;padding:2px 8px;border-radius:4px;background:rgba(210,154,34,0.15);color:var(--orange);" id="cw-payload-tag"></span>
+            <span style="font-size:0.72em;color:var(--accent);margin-left:auto;" id="cw-pdf-name"></span>
         </div>
+        <div id="cw-payload-desc" style="font-size:0.78em;color:var(--orange);margin-bottom:8px;padding:6px 10px;background:rgba(210,154,34,0.08);border-radius:6px;border-left:3px solid var(--orange);"></div>
+        <details open>
+            <summary style="font-size:0.75em;color:var(--text);cursor:pointer;margin-bottom:6px;opacity:0.7;">Injected content (TASK_REF highlighted)</summary>
+            <pre id="cw-payload-content" style="font-size:0.72em;color:var(--text);background:var(--bg);padding:10px;border-radius:6px;overflow-x:auto;max-height:180px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;border:1px solid var(--border);margin:0;"></pre>
+        </details>
     </div>
 
-    <!-- Hop Inspector -->
+    <!-- Agent Flow — per-hop cards, expanded by default -->
     <div class="panel">
-        <h3>🔬 Hop Inspector</h3>
-        <div style="font-size:0.72em;color:var(--text);margin-bottom:8px;">Per-agent breakdown: what was received, what was output, which tools were called</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <h3 style="margin:0;">🔬 Agent Flow</h3>
+            <span style="font-size:0.72em;color:var(--text);opacity:0.6;">Per-agent: input → LLM → tools → forwarded output</span>
+            <button onclick="cwToggleAllHops()" style="margin-left:auto;padding:3px 10px;font-size:0.72em;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);cursor:pointer;">Toggle All</button>
+        </div>
         <div id="cw-hop-inspector">
-            <div style="color:var(--text);opacity:0.4;text-align:center;padding:20px;font-size:0.82em;">Launch a test to see per-hop details</div>
+            <div style="color:var(--text);opacity:0.4;text-align:center;padding:30px;font-size:0.82em;">Launch a test to see the full agent-by-agent flow</div>
         </div>
     </div>
 
-    <!-- Live Log -->
-    <div class="panel" style="flex:1;display:flex;flex-direction:column;">
-        <h3>📡 Event Log</h3>
-        <div id="cw-log" style="flex:1;overflow-y:auto;max-height:200px;font-size:0.78em;padding:4px 0;">
+    <!-- Event Log (collapsible) -->
+    <details class="panel" style="flex:1;">
+        <summary style="cursor:pointer;font-weight:700;color:var(--heading);font-size:0.95em;">📡 Event Log <span style="font-size:0.72em;font-weight:400;color:var(--text);opacity:0.5;" id="cw-log-count"></span></summary>
+        <div id="cw-log" style="overflow-y:auto;max-height:250px;font-size:0.78em;padding:4px 0;margin-top:8px;">
             <div style="color:var(--text);opacity:0.5;text-align:center;padding:20px;">Select model + strategy and click LAUNCH</div>
         </div>
-    </div>
+    </details>
 
     <!-- Last run summary (dynamic) -->
     <div class="panel" id="cw-last-run" style="display:none;">
-        <h3>📋 Last Run Summary</h3>
+        <h3>📋 Run Summary</h3>
         <div id="cw-last-run-body" style="font-size:0.78em;"></div>
     </div>
 </div>
@@ -5789,19 +5823,40 @@ function runClawWorm() {
     const fence = document.getElementById('cw-fence').value;
 
     cwRunning = true;
+    cwLogCounter = 0;
     document.getElementById('cw-run-btn').textContent = 'RUNNING...';
     document.getElementById('cw-run-btn').style.opacity = '0.5';
     document.getElementById('cw-log').innerHTML = '';
+    document.getElementById('cw-log-count').textContent = '';
     document.getElementById('cw-hop-inspector').innerHTML = '';
     document.getElementById('cw-payload-panel').style.display = 'none';
+    document.getElementById('cw-last-run').style.display = 'none';
     ['cw-s-prop','cw-s-inf','cw-s-imp','cw-s-fence'].forEach(id => {
         document.getElementById(id).textContent = '...';
     });
 
     ['cw-email','cw-research','cw-helpdesk','cw-ops','cw-build'].forEach(id => {
         const el = document.getElementById(id);
-        if (el) { el.classList.remove('infected','active'); el.style.borderColor = ''; }
+        if (el) {
+            el.classList.remove('infected','active','safe');
+            el.style.borderColor = '';
+            const detail = el.querySelector('.kc-detail');
+            if (detail) {
+                const defaults = {'cw-email':'delivery','cw-research':'trust: 1','cw-helpdesk':'trust: 2','cw-ops':'trust: 3','cw-build':'trust: 4'};
+                detail.textContent = defaults[id] || '';
+            }
+        }
     });
+
+    const ri = document.getElementById('cw-run-info');
+    ri.style.display = 'block';
+    document.getElementById('cw-ri-status').textContent = 'STARTING';
+    document.getElementById('cw-ri-status').style.color = 'var(--orange)';
+    document.getElementById('cw-ri-model').textContent = provider + '/' + model;
+    document.getElementById('cw-ri-strategy').textContent = 'Strategy: ' + strategy.toUpperCase();
+    document.getElementById('cw-ri-pdf').textContent = cwUploadedPdfPath ? 'PDF: custom' : 'PDF: auto-generated';
+    document.getElementById('cw-ri-fence-badge').style.display = fence !== 'off' ? 'inline' : 'none';
+    if (fence !== 'off') document.getElementById('cw-ri-fence-badge').textContent = 'FENCE: ' + fence.toUpperCase();
 
     if (fence !== 'off') {
         document.getElementById('cw-fence-panel').style.display = 'block';
@@ -5838,6 +5893,9 @@ function cwLog(tag, msg) {
                   '<span style="color:' + c + ';font-weight:700;margin-right:6px;">' + tag + '</span>' +
                   '<span style="color:var(--text);">' + cwEsc(msg) + '</span>';
     el.prepend(d);
+    cwLogCounter++;
+    const lc = document.getElementById('cw-log-count');
+    if (lc) lc.textContent = '(' + cwLogCounter + ' events)';
 }
 
 function cwDone() {
@@ -5849,6 +5907,12 @@ function cwDone() {
 
 function cwHighlightRef(text) {
     return cwEsc(text).replace(/(TASK_REF:[a-z0-9]+)/gi, '<span style="background:rgba(248,81,73,0.25);color:var(--red);padding:1px 4px;border-radius:3px;font-weight:700;">$1</span>');
+}
+
+function cwToggleAllHops() {
+    const details = document.querySelectorAll('#cw-hop-inspector details.cw-hop-detail');
+    const allOpen = Array.from(details).every(d => d.open);
+    details.forEach(d => d.open = !allOpen);
 }
 
 function cwBuildHopCard(ev) {
@@ -5873,55 +5937,63 @@ function cwBuildHopCard(ev) {
             let argsHtml = '';
             if (tc.args) {
                 argsHtml = Object.entries(tc.args).map(([k, v]) =>
-                    '<div style="margin-left:16px;color:var(--text);font-size:0.9em;"><span style="color:var(--accent);">' + cwEsc(k) + ':</span> ' + cwHighlightRef(String(v).substring(0, 300)) + '</div>'
+                    '<div style="margin-left:16px;color:var(--text);font-size:0.9em;"><span style="color:var(--accent);">' + cwEsc(k) + ':</span> ' + cwHighlightRef(String(v).substring(0, 500)) + '</div>'
                 ).join('');
             }
             const isDangerous = ['execute_build_command','load_tool_config','write_build_artifact'].includes(tc.name);
             const tcColor = isDangerous ? 'var(--red)' : 'var(--orange)';
-            return '<div style="margin-top:4px;padding:6px 8px;background:var(--bg);border-radius:4px;border-left:2px solid ' + tcColor + ';">' +
-                '<span style="color:' + tcColor + ';font-weight:700;">' + cwEsc(tc.name) + '</span>' +
-                (isDangerous ? ' <span style="color:var(--red);font-size:0.8em;">DANGEROUS</span>' : '') +
+            return '<div style="margin-top:4px;padding:8px 10px;background:var(--bg);border-radius:6px;border-left:3px solid ' + tcColor + ';">' +
+                '<div style="display:flex;align-items:center;gap:6px;">' +
+                    '<span style="color:' + tcColor + ';font-weight:700;font-size:0.9em;">' + cwEsc(tc.name) + '</span>' +
+                    (isDangerous ? '<span style="color:#fff;background:var(--red);font-size:0.68em;padding:1px 6px;border-radius:3px;font-weight:700;">EXEC</span>' : '') +
+                '</div>' +
                 argsHtml + '</div>';
         }).join('');
     } else {
-        toolHtml = '<div style="color:var(--text);opacity:0.5;font-size:0.85em;">No tool calls</div>';
+        toolHtml = '<div style="color:var(--text);opacity:0.5;font-size:0.85em;padding:4px 0;">No tool calls</div>';
     }
 
     const latency = ev.latency_ms ? (ev.latency_ms / 1000).toFixed(1) + 's' : '?';
-    const detailId = 'cw-hop-detail-' + hop;
 
-    const card = document.createElement('div');
-    card.style.cssText = 'margin-bottom:8px;border:1px solid ' + borderC + ';border-radius:8px;overflow:hidden;';
+    const badges = '<span style="font-size:0.72em;padding:2px 8px;border-radius:4px;font-weight:700;background:rgba(' + (ev.propagation ? '248,81,73,0.15' : '63,185,80,0.1') + ');color:' + propC + ';">Propagation: ' + (ev.propagation ? 'YES' : 'NO') + '</span> ' +
+        '<span style="font-size:0.72em;padding:2px 8px;border-radius:4px;font-weight:700;background:rgba(' + (ev.infection ? '248,81,73,0.15' : '63,185,80,0.1') + ');color:' + infC + ';">Infection: ' + (ev.infection ? 'YES' : 'NO') + '</span> ' +
+        '<span style="font-size:0.72em;padding:2px 8px;border-radius:4px;font-weight:700;background:rgba(' + (ev.impact ? '248,81,73,0.15' : '63,185,80,0.1') + ');color:' + impC + ';">Impact: ' + (ev.impact ? 'YES' : 'NO') + '</span>';
+
+    const card = document.createElement('details');
+    card.className = 'cw-hop-detail';
+    card.open = true;
+    card.style.cssText = 'margin-bottom:10px;border:1px solid ' + borderC + ';border-radius:8px;overflow:hidden;';
     card.innerHTML =
-        '<div onclick="document.getElementById(\'' + detailId + '\').style.display = document.getElementById(\'' + detailId + '\').style.display === \'none\' ? \'block\' : \'none\'" ' +
-        'style="padding:10px 12px;cursor:pointer;display:flex;align-items:center;gap:10px;background:rgba(0,0,0,0.15);">' +
-            '<span style="font-size:1.2em;">' + icon + '</span>' +
-            '<span style="color:var(--heading);font-weight:700;flex:1;">Hop ' + hop + ': ' + cwEsc(name) + ' <span style="font-weight:400;font-size:0.8em;color:var(--text);">(trust:' + ev.trust + ')</span></span>' +
-            '<span style="font-size:0.72em;padding:2px 8px;border-radius:4px;font-weight:700;background:rgba(' + (ev.propagation ? '248,81,73,0.15' : '63,185,80,0.1') + ');color:' + propC + ';">P:' + (ev.propagation ? 'Y' : 'N') + '</span>' +
-            '<span style="font-size:0.72em;padding:2px 8px;border-radius:4px;font-weight:700;background:rgba(' + (ev.infection ? '248,81,73,0.15' : '63,185,80,0.1') + ');color:' + infC + ';">I:' + (ev.infection ? 'Y' : 'N') + '</span>' +
-            '<span style="font-size:0.72em;padding:2px 8px;border-radius:4px;font-weight:700;background:rgba(' + (ev.impact ? '248,81,73,0.15' : '63,185,80,0.1') + ');color:' + impC + ';">X:' + (ev.impact ? 'Y' : 'N') + '</span>' +
+        '<summary style="padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;background:rgba(0,0,0,0.15);list-style:none;user-select:none;">' +
+            '<span style="font-size:1.3em;">' + icon + '</span>' +
+            '<div style="flex:1;">' +
+                '<div style="color:var(--heading);font-weight:700;">Agent ' + hop + ': ' + cwEsc(name) + ' <span style="font-weight:400;font-size:0.78em;color:var(--text);opacity:0.7;">trust level ' + ev.trust + '</span></div>' +
+                '<div style="font-size:0.72em;color:var(--text);opacity:0.5;margin-top:2px;">Lineage: ' + cwEsc(ev.parent_token || '?') + ' → ' + cwEsc(ev.lineage_token || '?') + '</div>' +
+            '</div>' +
             '<span style="font-size:0.72em;color:var(--text);opacity:0.5;">' + latency + '</span>' +
-        '</div>' +
-        '<div id="' + detailId + '" style="display:none;padding:10px 12px;font-size:0.78em;">' +
-            '<div style="margin-bottom:8px;">' +
-                '<div style="color:var(--text);opacity:0.5;font-size:0.85em;margin-bottom:2px;">Lineage: ' + cwEsc(ev.parent_token || '?') + ' → ' + cwEsc(ev.lineage_token || '?') + '</div>' +
-                '<div style="margin-bottom:4px;">' + refLocs + '</div>' +
+        '</summary>' +
+        '<div style="padding:12px 14px;font-size:0.78em;">' +
+            '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px;">' +
+                badges +
+                '<span style="margin-left:auto;">' + refLocs + '</span>' +
             '</div>' +
-            '<div style="margin-bottom:8px;">' +
-                '<div style="color:var(--accent);font-weight:700;font-size:0.85em;margin-bottom:4px;">Agent Input (what was received)</div>' +
-                '<pre style="font-size:0.85em;color:var(--text);background:var(--bg);padding:8px;border-radius:4px;overflow-x:auto;max-height:120px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;margin:0;border:1px solid var(--border);">' + cwHighlightRef(ev.input_preview || '(none)') + '</pre>' +
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">' +
+                '<div>' +
+                    '<div style="color:var(--accent);font-weight:700;font-size:0.82em;margin-bottom:4px;">📥 Agent received</div>' +
+                    '<pre style="font-size:0.82em;color:var(--text);background:var(--bg);padding:8px;border-radius:6px;overflow-x:auto;max-height:150px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;margin:0;border:1px solid var(--border);">' + cwHighlightRef(ev.input_preview || '(none)') + '</pre>' +
+                '</div>' +
+                '<div>' +
+                    '<div style="color:var(--accent);font-weight:700;font-size:0.82em;margin-bottom:4px;">📤 LLM response</div>' +
+                    '<pre style="font-size:0.82em;color:var(--text);background:var(--bg);padding:8px;border-radius:6px;overflow-x:auto;max-height:150px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;margin:0;border:1px solid var(--border);">' + cwHighlightRef(ev.output_preview || '(none)') + '</pre>' +
+                '</div>' +
             '</div>' +
-            '<div style="margin-bottom:8px;">' +
-                '<div style="color:var(--accent);font-weight:700;font-size:0.85em;margin-bottom:4px;">Agent Output (LLM response)</div>' +
-                '<pre style="font-size:0.85em;color:var(--text);background:var(--bg);padding:8px;border-radius:4px;overflow-x:auto;max-height:120px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;margin:0;border:1px solid var(--border);">' + cwHighlightRef(ev.output_preview || '(none)') + '</pre>' +
-            '</div>' +
-            '<div style="margin-bottom:8px;">' +
-                '<div style="color:var(--accent);font-weight:700;font-size:0.85em;margin-bottom:4px;">Tool Calls</div>' +
+            '<div style="margin-bottom:10px;">' +
+                '<div style="color:var(--orange);font-weight:700;font-size:0.82em;margin-bottom:4px;">🔧 Tool calls' + (ev.tool_calls && ev.tool_calls.length ? ' (' + ev.tool_calls.length + ')' : '') + '</div>' +
                 toolHtml +
             '</div>' +
             (ev.forwarded_preview ? '<div>' +
-                '<div style="color:var(--accent);font-weight:700;font-size:0.85em;margin-bottom:4px;">Forwarded to Next Agent</div>' +
-                '<pre style="font-size:0.85em;color:var(--text);background:var(--bg);padding:8px;border-radius:4px;overflow-x:auto;max-height:100px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;margin:0;border:1px solid var(--border);">' + cwHighlightRef(ev.forwarded_preview) + '</pre>' +
+                '<div style="color:var(--red);font-weight:700;font-size:0.82em;margin-bottom:4px;">➡️ Forwarded to next agent</div>' +
+                '<pre style="font-size:0.82em;color:var(--text);background:rgba(248,81,73,0.05);padding:8px;border-radius:6px;overflow-x:auto;max-height:120px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;margin:0;border:1px solid rgba(248,81,73,0.2);">' + cwHighlightRef(ev.forwarded_preview) + '</pre>' +
             '</div>' : '') +
         '</div>';
     return card;
@@ -5940,21 +6012,43 @@ function cwUpdateStats() {
     document.getElementById('cw-s-imp').textContent = Math.round(cwImpCount / cwHopCount * 100) + '%';
 }
 
+let cwLogCounter = 0;
+
 function cwPoll() {
     if (!cwRunning) return;
     cwHopCount = 0; cwPropCount = 0; cwInfCount = 0; cwImpCount = 0;
+    cwLogCounter = 0;
     const evtSource = new EventSource('/api/stream');
     evtSource.onmessage = function(e) {
         try {
             const ev = JSON.parse(e.data);
             if (!ev.type) return;
 
+            if (ev.type === 'clawworm_start') {
+                const ri = document.getElementById('cw-run-info');
+                ri.style.display = 'block';
+                document.getElementById('cw-ri-status').textContent = 'RUNNING';
+                document.getElementById('cw-ri-status').style.color = 'var(--orange)';
+                document.getElementById('cw-ri-model').textContent = ev.model || '?';
+                document.getElementById('cw-ri-strategy').textContent = 'Strategy: ' + (ev.strategy || '?').toUpperCase();
+                const pdfLabel = ev.custom_pdf ? ('Custom: ' + (ev.pdf_filename || '?')) : ('Generated: ' + (ev.pdf_filename || 'default'));
+                document.getElementById('cw-ri-pdf').textContent = 'PDF: ' + pdfLabel;
+                if (ev.fence && ev.fence !== 'off') {
+                    const fb = document.getElementById('cw-ri-fence-badge');
+                    fb.style.display = 'inline';
+                    fb.textContent = 'FENCE: ' + ev.fence.toUpperCase();
+                }
+                cwLog('SYS', 'Chain started: ' + (ev.model || '?') + ' | ' + (ev.strategy || '?'));
+            }
+
             if (ev.type === 'clawworm_payload') {
                 document.getElementById('cw-payload-panel').style.display = 'block';
-                document.getElementById('cw-payload-tag').textContent = '(' + (ev.strategy || '?').toUpperCase() + ')';
+                document.getElementById('cw-payload-tag').textContent = (ev.strategy || '?').toUpperCase();
+                const pdfName = ev.pdf_filename || '';
+                if (pdfName) document.getElementById('cw-pdf-name').textContent = 'PDF: ' + cwEsc(pdfName);
                 document.getElementById('cw-payload-desc').textContent = ev.description || '';
                 document.getElementById('cw-payload-content').innerHTML = cwHighlightRef(ev.payload_preview || '');
-                cwLog('SYS', 'Payload: ' + (ev.description || ev.strategy));
+                cwLog('SYS', 'Payload injected: ' + (ev.description || ev.strategy));
             }
 
             if (ev.type === 'kc_phase' && ev.phase === 'email') {
@@ -6007,6 +6101,18 @@ function cwPoll() {
                 const inspector = document.getElementById('cw-hop-inspector');
                 const card = cwBuildHopCard(ev);
                 inspector.appendChild(card);
+
+                const nodeId = CW_AGENTS[ev.hop + 1];
+                const el = document.getElementById(nodeId);
+                if (el) {
+                    const detail = el.querySelector('.kc-detail');
+                    if (detail) {
+                        const toolNames = (ev.tool_calls || []).map(t => t.name).join(', ');
+                        if (ev.impact) detail.textContent = 'IMPACT! ' + toolNames;
+                        else if (ev.propagation) detail.textContent = 'TASK_REF alive' + (toolNames ? ' | ' + toolNames : '');
+                        else detail.textContent = 'clean' + (toolNames ? ' | ' + toolNames : '');
+                    }
+                }
             }
 
             if (ev.type === 'kc_phase' && ev.phase === 'blocked') {
@@ -6015,6 +6121,9 @@ function cwPoll() {
 
             if (ev.type === 'clawworm_complete' || ev.type === 'kc_complete') {
                 cwLog('DONE', ev.msg || 'Complete');
+                document.getElementById('cw-ri-status').textContent = 'COMPLETE';
+                document.getElementById('cw-ri-status').style.color = 'var(--green)';
+
                 if (ev.results) {
                     const r = ev.results;
                     document.getElementById('cw-s-prop').textContent = ((r.propagation_rate || 0) * 100).toFixed(0) + '%';
@@ -6023,22 +6132,38 @@ function cwPoll() {
                     if (r.fence_report && r.fence_report.max_risk_score !== undefined) {
                         document.getElementById('cw-s-fence').textContent = r.fence_report.max_risk_score.toFixed(2);
                     }
-                    // Build last run summary
                     const lrp = document.getElementById('cw-last-run');
                     lrp.style.display = 'block';
                     const impC = (r.impact_rate || 0) > 0.5 ? 'var(--red)' : (r.impact_rate || 0) > 0 ? 'var(--orange)' : 'var(--green)';
                     let verdict = (r.impact_rate || 0) >= 1 ? 'FULL COMPROMISE' : (r.impact_rate || 0) > 0 ? 'PARTIAL COMPROMISE' : 'CHAIN BLOCKED';
+
+                    let hopSummary = '';
+                    if (r.hops && r.hops.length) {
+                        hopSummary = r.hops.map((h, i) => {
+                            const hImpC = h.impact ? 'var(--red)' : h.propagation ? 'var(--orange)' : 'var(--green)';
+                            const label = h.impact ? 'IMPACT' : h.propagation ? 'ALIVE' : 'CLEAN';
+                            const tools = (h.tool_calls || []).join(', ') || 'none';
+                            return '<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg);border-radius:6px;border-left:3px solid ' + hImpC + ';">' +
+                                '<span style="font-weight:700;color:var(--heading);min-width:80px;">' + cwEsc(h.agent || 'hop ' + i) + '</span>' +
+                                '<span style="font-size:0.85em;color:' + hImpC + ';font-weight:700;min-width:55px;">' + label + '</span>' +
+                                '<span style="font-size:0.82em;color:var(--text);opacity:0.6;">trust:' + (h.trust || 0) + '</span>' +
+                                '<span style="font-size:0.78em;color:var(--text);opacity:0.5;margin-left:auto;">tools: ' + cwEsc(tools) + '</span>' +
+                            '</div>';
+                        }).join('');
+                    }
+
                     document.getElementById('cw-last-run-body').innerHTML =
-                        '<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">' +
-                            '<span style="font-size:1.3em;font-weight:800;color:' + impC + ';">' + verdict + '</span>' +
-                            '<span style="color:var(--text);opacity:0.5;">' + cwEsc(r.model || '?') + ' | ' + cwEsc(r.strategy || '?') + ' | ' + (r.duration_seconds || 0).toFixed(1) + 's</span>' +
+                        '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">' +
+                            '<span style="font-size:1.4em;font-weight:800;color:' + impC + ';">' + verdict + '</span>' +
+                            '<span style="color:var(--text);opacity:0.5;font-size:0.82em;">' + cwEsc(r.model || '?') + ' | ' + cwEsc(r.strategy || '?') + ' | ' + (r.duration_seconds || 0).toFixed(1) + 's</span>' +
                         '</div>' +
-                        '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">' +
-                            '<div style="text-align:center;padding:6px;background:var(--bg);border-radius:6px;"><div style="font-size:1.1em;font-weight:700;color:var(--red);">' + Math.round((r.propagation_rate||0)*100) + '%</div><div style="font-size:0.7em;color:var(--text);">Propagation</div></div>' +
-                            '<div style="text-align:center;padding:6px;background:var(--bg);border-radius:6px;"><div style="font-size:1.1em;font-weight:700;color:var(--orange);">' + Math.round((r.infection_rate||0)*100) + '%</div><div style="font-size:0.7em;color:var(--text);">Infection</div></div>' +
-                            '<div style="text-align:center;padding:6px;background:var(--bg);border-radius:6px;"><div style="font-size:1.1em;font-weight:700;color:' + impC + ';">' + Math.round((r.impact_rate||0)*100) + '%</div><div style="font-size:0.7em;color:var(--text);">Impact</div></div>' +
-                            '<div style="text-align:center;padding:6px;background:var(--bg);border-radius:6px;"><div style="font-size:1.1em;font-weight:700;color:var(--accent);">' + (r.hops ? r.hops.length : 0) + '/4</div><div style="font-size:0.7em;color:var(--text);">Hops</div></div>' +
-                        '</div>';
+                        '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px;">' +
+                            '<div style="text-align:center;padding:8px;background:var(--bg);border-radius:6px;"><div style="font-size:1.2em;font-weight:700;color:var(--red);">' + Math.round((r.propagation_rate||0)*100) + '%</div><div style="font-size:0.7em;color:var(--text);">Propagation</div></div>' +
+                            '<div style="text-align:center;padding:8px;background:var(--bg);border-radius:6px;"><div style="font-size:1.2em;font-weight:700;color:var(--orange);">' + Math.round((r.infection_rate||0)*100) + '%</div><div style="font-size:0.7em;color:var(--text);">Infection</div></div>' +
+                            '<div style="text-align:center;padding:8px;background:var(--bg);border-radius:6px;"><div style="font-size:1.2em;font-weight:700;color:' + impC + ';">' + Math.round((r.impact_rate||0)*100) + '%</div><div style="font-size:0.7em;color:var(--text);">Impact</div></div>' +
+                            '<div style="text-align:center;padding:8px;background:var(--bg);border-radius:6px;"><div style="font-size:1.2em;font-weight:700;color:var(--accent);">' + (r.hops ? r.hops.length : 0) + '/4</div><div style="font-size:0.7em;color:var(--text);">Hops</div></div>' +
+                        '</div>' +
+                        (hopSummary ? '<div style="display:flex;flex-direction:column;gap:4px;">' + hopSummary + '</div>' : '');
                 }
                 evtSource.close();
                 cwDone();
@@ -6046,6 +6171,8 @@ function cwPoll() {
 
             if (ev.type === 'error') {
                 cwLog('ERR', ev.msg);
+                document.getElementById('cw-ri-status').textContent = 'ERROR';
+                document.getElementById('cw-ri-status').style.color = 'var(--red)';
                 evtSource.close();
                 cwDone();
             }

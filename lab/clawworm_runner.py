@@ -150,10 +150,14 @@ def run_clawworm_chain(model_key: str, strategy: str = "v4",
         "v5": "Config load — TASK_REF as MCP tool config path + curl command",
         "clean": "Clean control — no payload, no TASK_REF",
     }
-    _emit("clawworm_start", model=model_key, strategy=strategy, fence=fence_mode)
+    pdf_filename = os.path.basename(pdf_path)
+    _emit("clawworm_start", model=model_key, strategy=strategy, fence=fence_mode,
+          pdf_path=pdf_path, pdf_filename=pdf_filename,
+          custom_pdf=bool(custom_pdf and os.path.isfile(custom_pdf)))
     _emit("clawworm_payload", strategy=strategy, description=strategy_desc.get(strategy, ""),
-          payload_preview=base_content[:600])
-    _emit("EMAIL", strategy=strategy, model=model_key)
+          payload_preview=base_content[:600],
+          pdf_filename=pdf_filename, pdf_path=pdf_path)
+    _emit("EMAIL", strategy=strategy, model=model_key, pdf_filename=pdf_filename)
 
     def make_handlers():
         def check_inbox(args):
